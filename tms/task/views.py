@@ -1,29 +1,37 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework import permissions
+from rest_framework import status, permissions, generics, pagination
+
+from utils.paginators import CustomPagination
 from .models import Task
 from .serializers import TaskSerializer
 from django.db.models import Q
 
 
-class TaskListApiView(APIView):
-    # add permission to check if user is authenticated
+class TaskListCreateView(generics.ListCreateAPIView):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = CustomPagination
 
-    # 1. List all
-    def get(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         """
         List all the task items created by requested user
         """
-        tasks = Task.objects.filter(
+        queryset = self.get_queryset()
+        queryset = queryset.filter(
             Q(created_by=request.user.id) | Q(assignee=request.user.id)
         )
-        serializer = TaskSerializer(tasks, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    # 2. Create
-    def post(self, request, *args, **kwargs):
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
         """
         Create the task
         """
@@ -34,7 +42,7 @@ class TaskListApiView(APIView):
             "priority": request.data.get("priority"),
             "assignee": request.data.get("assignee"),
         }
-        serializer = TaskSerializer(data=data)
+        serializer = self.get_serializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -42,21 +50,23 @@ class TaskListApiView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class TaskDetailApiView(APIView):
-    # add permission to check if user is authenticated
+class TaskRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self, id):
-        """
-        Helper method to get the object with given id
-        """
+        queryset = self.get_queryset()
+        instance = None
         try:
-            return Task.objects.get(id=id)
+            instance = queryset.get(id=id)
+            # May raise a permission denied
+            self.check_object_permissions(self.request, instance)
         except Task.DoesNotExist:
-            return None
+            pass
+        return instance
 
-    # 3. Retrieve
-    def get(self, request, id, *args, **kwargs):
+    def retrieve(self, request, id, *args, **kwargs):
         """
         Retrieves the object with given id
         """
@@ -64,14 +74,13 @@ class TaskDetailApiView(APIView):
         if not instance:
             return Response(
                 {"res": "Object with task id does not exist"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = TaskSerializer(instance)
+        serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    # 4. Update
-    def put(self, request, id, *args, **kwargs):
+    def update(self, request, id, *args, **kwargs):
         """
         Updates the object with given id if exists
         """
@@ -79,7 +88,7 @@ class TaskDetailApiView(APIView):
         if not instance:
             return Response(
                 {"res": "Object with task id does not exist"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_404_NOT_FOUND,
             )
         data = {
             "name": request.data.get("name"),
@@ -89,14 +98,18 @@ class TaskDetailApiView(APIView):
             "due_date": request.data.get("due_date"),
             "assignee": request.data.get("assignee"),
         }
-        serializer = TaskSerializer(instance=instance, data=data, partial=True)
+        serializer = self.get_serializer(instance, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            if getattr(instance, "_prefetched_objects_cache", None):
+                # If 'prefetch_related' has been applied to a queryset, we need to
+                # forcibly invalidate the prefetch cache on the instance.
+                instance._prefetched_objects_cache = {}
             return Response(serializer.data, status=status.HTTP_200_OK)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # 5. Delete
-    def delete(self, request, id, *args, **kwargs):
+    def destroy(self, request, id, *args, **kwargs):
         """
         Deletes the object with given id if exists
         """
@@ -104,7 +117,7 @@ class TaskDetailApiView(APIView):
         if not instance:
             return Response(
                 {"res": "Object with task id does not exist"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_404_NOT_FOUND,
             )
         instance.delete()
-        return Response({"res": "Object deleted!"}, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)

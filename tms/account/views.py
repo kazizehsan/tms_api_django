@@ -24,15 +24,16 @@ class UserDetailView(APIView):
         """
         Retrieves the object with given id
         """
+        instance = None
         try:
             instance = User.objects.select_related().get(id=id)
         except User.DoesNotExist:
-            return None
+            pass
         
         if not instance:
             return Response(
                 {"res": "Object with task id does not exist"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         serializer = UserSerializer(instance)

@@ -5,7 +5,7 @@ from .models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
-    assigned_tasks = TaskSerializer(many=True)
+    assigned_tasks = TaskSerializer(many=True, required=False)
 
     class Meta:
         model = User
