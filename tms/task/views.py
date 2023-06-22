@@ -1,11 +1,10 @@
-from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions, generics, pagination
+from rest_framework import status, permissions, generics, filters
+from django_filters.rest_framework import DjangoFilterBackend
 
 from utils.paginators import CustomPagination
 from .models import Task
 from .serializers import TaskSerializer
-from django.db.models import Q
 
 
 class TaskListCreateView(generics.ListCreateAPIView):
@@ -13,15 +12,28 @@ class TaskListCreateView(generics.ListCreateAPIView):
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = CustomPagination
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+    filterset_fields = ["assignee", "completed", "due_date", "priority"]
+    search_fields = ["name", "description"]
+    ordering_fields = ["due_date", "priority"]
 
     def list(self, request, *args, **kwargs):
         """
-        List all the task items created by requested user
+        List all the task items requested by user
         """
-        queryset = self.get_queryset()
-        queryset = queryset.filter(
-            Q(created_by=request.user.id) | Q(assignee=request.user.id)
+        requestSerializer = self.get_serializer(
+            data=self.request.query_params, partial=True
         )
+        if not requestSerializer.is_valid():
+            return Response(
+                requestSerializer.errors, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        queryset = self.filter_queryset(self.get_queryset())
 
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -35,14 +47,7 @@ class TaskListCreateView(generics.ListCreateAPIView):
         """
         Create the task
         """
-        data = {
-            "name": request.data.get("name"),
-            "description": request.data.get("description"),
-            "due_date": request.data.get("due_date"),
-            "priority": request.data.get("priority"),
-            "assignee": request.data.get("assignee"),
-        }
-        serializer = self.get_serializer(data=data)
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -90,15 +95,8 @@ class TaskRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
                 {"res": "Object with task id does not exist"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        data = {
-            "name": request.data.get("name"),
-            "description": request.data.get("description"),
-            "completed": request.data.get("completed"),
-            "priority": request.data.get("priority"),
-            "due_date": request.data.get("due_date"),
-            "assignee": request.data.get("assignee"),
-        }
-        serializer = self.get_serializer(instance, data=data, partial=True)
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             if getattr(instance, "_prefetched_objects_cache", None):
