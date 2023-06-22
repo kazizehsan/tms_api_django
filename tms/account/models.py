@@ -27,7 +27,7 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
-class UserData(AbstractUser):
+class User(AbstractUser):
 
     username = None
     name = models.CharField(max_length=100, unique=True)
