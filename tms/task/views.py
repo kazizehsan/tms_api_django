@@ -10,7 +10,7 @@ from .serializers import TaskSerializer
 class TaskListCreateView(generics.ListCreateAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.DjangoModelPermissions]
     pagination_class = CustomPagination
     filter_backends = [
         DjangoFilterBackend,
@@ -58,7 +58,7 @@ class TaskListCreateView(generics.ListCreateAPIView):
 class TaskRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.DjangoModelPermissions]
 
     def get_object(self, id):
         queryset = self.get_queryset()
