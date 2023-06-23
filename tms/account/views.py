@@ -1,5 +1,7 @@
 from rest_framework.views import APIView
 
+from utils.permissions import IsRequestedUser
+
 from .models import User
 from .serializers import UserSerializer
 from rest_framework.response import Response
@@ -17,7 +19,7 @@ class RegisterView(APIView):
 
 class UserDetailView(APIView):
     # add permission to check if user is authenticated
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser | IsRequestedUser]
 
     # Retrieve
     def get(self, request, id, *args, **kwargs):
@@ -27,9 +29,10 @@ class UserDetailView(APIView):
         instance = None
         try:
             instance = User.objects.select_related().get(id=id)
+            self.check_object_permissions(request, instance)
         except User.DoesNotExist:
             pass
-        
+
         if not instance:
             return Response(
                 {"res": "Object with task id does not exist"},
