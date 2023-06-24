@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 
 from utils.permissions import IsRequestedUser
 from django.contrib.auth.models import Group
+from drf_spectacular.utils import extend_schema
 
 from .models import User
 from .serializers import (
@@ -15,6 +16,10 @@ from rest_framework import permissions, status
 
 # view for registering users
 class RegisterView(APIView):
+    @extend_schema(
+        request=UserSerializer,
+        responses={200: UserSerializer},
+    )
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -23,7 +28,6 @@ class RegisterView(APIView):
 
 
 class UserDetailView(APIView):
-    # add permission to check if user is authenticated
     permission_classes = [permissions.IsAdminUser | IsRequestedUser]
 
     def get_object(self, id):
@@ -35,7 +39,10 @@ class UserDetailView(APIView):
             pass
         return instance
 
-    # Retrieve
+    @extend_schema(
+        responses={200: UserSerializer},
+        description="Superuser can retrieve everyone's details. Other users can only retrieve their own details.",
+    )
     def get(self, request, id, *args, **kwargs):
         instance = self.get_object(id)
         if not instance:
@@ -48,6 +55,11 @@ class UserDetailView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     # Update
+    @extend_schema(
+        request=UserGroupUpdateRequestSerializer,
+        responses={200: UserSerializer},
+        description="For updating groups that a user belongs to. Accessible by Superuser only.",
+    )
     def put(self, request, id, *args, **kwargs):
         # exclusive for admins
         is_admin_user = bool(request.user and request.user.is_staff)
@@ -79,6 +91,9 @@ class UserDetailView(APIView):
 class GroupListView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
+    @extend_schema(
+        responses={200: GroupSerializer},
+    )
     def get(self, request, *args, **kwargs):
         queryset = Group.objects.all()
         serializer = GroupSerializer(queryset, many=True)

@@ -22,9 +22,6 @@ class TaskListCreateView(generics.ListCreateAPIView):
     ordering_fields = ["due_date", "priority"]
 
     def list(self, request, *args, **kwargs):
-        """
-        List all the task items requested by user
-        """
         requestSerializer = self.get_serializer(
             data=self.request.query_params, partial=True
         )
@@ -44,9 +41,6 @@ class TaskListCreateView(generics.ListCreateAPIView):
         return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
-        """
-        Create the task
-        """
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
