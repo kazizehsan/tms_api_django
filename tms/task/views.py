@@ -20,6 +20,7 @@ class TaskListCreateView(generics.ListCreateAPIView):
     filterset_fields = ["assignee", "completed", "due_date", "priority"]
     search_fields = ["name", "description"]
     ordering_fields = ["due_date", "priority"]
+    ordering = ['id']
 
     def list(self, request, *args, **kwargs):
         requestSerializer = self.get_serializer(
